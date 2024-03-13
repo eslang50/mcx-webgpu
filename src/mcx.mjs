@@ -1,57 +1,54 @@
-
 import WebGPU from "webgpu";
-
 import fs from 'fs';
 
 // Initialize WebGPU context
-const renderer = new WebGPURenderer();
+const renderer = new WebGPU.WebGPURenderer(); // Use WebGPU namespace
 await renderer.initialize();
 
+// Load shader code from files
 const rayGenerationShaderCode = fs.readFileSync('ray_generation_shader.rchit', 'utf8');
 const intersectionShaderCode = fs.readFileSync('ray_generation.rgen', 'utf8');
 const closestHitShaderCode = fs.readFileSync('ray_intersection.rint', 'utf8');
 const missShaderCode = fs.readFileSync('ray_miss.rmiss', 'utf8');
 
-
-// Load shaders
-const rayGenerationShader = new WebGPUShaderModule("ray_generation_shader", WebGPUShaderStage.Compute, rayGenerationShaderCode);
-const intersectionShader = new WebGPUShaderModule("intersection_shader", WebGPUShaderStage.Compute, intersectionShaderCode);
-const closestHitShader = new WebGPUShaderModule("closest_hit_shader", WebGPUShaderStage.Compute, closestHitShaderCode);
-const missShader = new WebGPUShaderModule("miss_shader", WebGPUShaderStage.Compute, missShaderCode);
+// Create shader modules
+const rayGenerationShaderModule = renderer.createShaderModule({ code: rayGenerationShaderCode });
+const intersectionShaderModule = renderer.createShaderModule({ code: intersectionShaderCode });
+const closestHitShaderModule = renderer.createShaderModule({ code: closestHitShaderCode });
+const missShaderModule = renderer.createShaderModule({ code: missShaderCode });
 
 // Load textures
-const absorptionTexture = await WebGPUTextureLoader.loadTexture("absorption_texture.png", renderer, WebGPULoadOptions.Default);
-const scatteringTexture = await WebGPUTextureLoader.loadTexture("scattering_texture.png", renderer, WebGPULoadOptions.Default);
+const absorptionTexture = await renderer.loadTexture("absorption_texture.png", WebGPU.WebGPULoadOptions.Default); // Use WebGPU namespace
+const scatteringTexture = await renderer.loadTexture("scattering_texture.png", WebGPU.WebGPULoadOptions.Default); // Use WebGPU namespace
 
 // Create uniform buffer for grid data
 const gridDimensions = [64, 64, 64]; // Example dimensions
 const voxelSize = 0.1; // Example voxel size
-const gridDataBuffer = new WebGPUUniformBuffer(renderer, Float32Array.from([...gridDimensions, voxelSize]));
+const gridDataBuffer = renderer.createUniformBuffer(Float32Array.from([...gridDimensions, voxelSize])); // Use renderer.createUniformBuffer
 
 // Create shader bindings
-const sourceDataBinding = new WebGPUShaderBinding("SourceData", sourceDataBuffer);
-const gridDataBinding = new WebGPUShaderBinding("GridData", gridDataBuffer);
-const absorptionMapBinding = new WebGPUShaderBinding("AbsorptionMap", absorptionTexture);
-const scatteringMapBinding = new WebGPUShaderBinding("ScatteringMap", scatteringTexture);
+const sourceDataBinding = new WebGPU.WebGPUShaderBinding("SourceData", sourceDataBuffer); // Assuming sourceDataBuffer is defined elsewhere
+const gridDataBinding = new WebGPU.WebGPUShaderBinding("GridData", gridDataBuffer);
+const absorptionMapBinding = new WebGPU.WebGPUShaderBinding("AbsorptionMap", absorptionTexture);
+const scatteringMapBinding = new WebGPU.WebGPUShaderBinding("ScatteringMap", scatteringTexture);
 
 // Create compute pipeline for ray tracing
-const rayTracingPipeline = new WebGPURayTracingPipeline(renderer);
-rayTracingPipeline.setShaderStage("rayGeneration", rayGenerationShader);
-rayTracingPipeline.setShaderStage("intersection", intersectionShader);
-rayTracingPipeline.setShaderStage("closestHit", closestHitShader);
-rayTracingPipeline.setShaderStage("miss", missShader);
+const rayTracingPipeline = renderer.createRayTracingPipeline(); // Use renderer.createRayTracingPipeline
+rayTracingPipeline.setShaderStage("rayGeneration", rayGenerationShaderModule);
+rayTracingPipeline.setShaderStage("intersection", intersectionShaderModule);
+rayTracingPipeline.setShaderStage("closestHit", closestHitShaderModule);
+rayTracingPipeline.setShaderStage("miss", missShaderModule);
 
 // Set up render pass
-const renderPass = new WebGPURenderPass(renderer);
-const renderPassDesc = new WebGPURenderPassDescriptor(renderer.viewportWidth, renderer.viewportHeight);
+const renderPassDesc = renderer.createRenderPassDescriptor(); // Use renderer.createRenderPassDescriptor
 
 // Dispatch ray tracing shader
-renderPass.setPipeline(rayTracingPipeline);
-renderPass.setShaderBinding("SourceData", sourceDataBinding);
-renderPass.setShaderBinding("GridData", gridDataBinding);
-renderPass.setShaderBinding("AbsorptionMap", absorptionMapBinding);
-renderPass.setShaderBinding("ScatteringMap", scatteringMapBinding);
-renderPass.dispatch(1, 1, 1);
+renderPassDesc.setPipeline(rayTracingPipeline);
+renderPassDesc.setShaderBinding("SourceData", sourceDataBinding);
+renderPassDesc.setShaderBinding("GridData", gridDataBinding);
+renderPassDesc.setShaderBinding("AbsorptionMap", absorptionMapBinding);
+renderPassDesc.setShaderBinding("ScatteringMap", scatteringMapBinding);
+renderPassDesc.dispatch(1, 1, 1);
 
 // Execute render pass
 renderer.beginFrame();
