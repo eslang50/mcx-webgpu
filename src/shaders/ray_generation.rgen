@@ -10,5 +10,5 @@ void main() {
     ray.direction = sourceDirection;
     ray.tmin = 0.0;
     ray.tmax = FLT_MAX;
-    emit ray;
+    emitRay(ray,0);
 }

@@ -6,11 +6,10 @@ void main() {
     float scatteringProb = textureSample(scatteringMap, gl_InstanceIndex.xy).r;
 
     if (random() < absorptionProb) {
-        // Ray is absorbed, terminate
+        TerminateRay();
     } else if (random() < absorptionProb + scatteringProb) {
         // Ray is scattered, generate a new scattered ray
-        // ... (code to calculate scattered direction)
-        emit scatteredRay;
+        TraceRay(hitPoint, scatteredRayDirection, maxDistance);
     } else {
         // Ray continues along its original direction
     }
