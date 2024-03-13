@@ -1,57 +1,52 @@
 import WebGPU from "webgpu";
-import fs from 'fs';
+import fs from "fs";
+import glMatrix from "gl-matrix";
 
-// Initialize WebGPU context
-const renderer = new WebGPU.WebGPURenderer(); // Use WebGPU namespace
-await renderer.initialize();
+Object.assign(global, WebGPU);
+Object.assign(global, glMatrix);
 
-// Load shader code from files
-const rayGenerationShaderCode = fs.readFileSync('ray_generation_shader.rchit', 'utf8');
-const intersectionShaderCode = fs.readFileSync('ray_generation.rgen', 'utf8');
-const closestHitShaderCode = fs.readFileSync('ray_intersection.rint', 'utf8');
-const missShaderCode = fs.readFileSync('ray_miss.rmiss', 'utf8');
+(async function main() {
 
-// Create shader modules
-const rayGenerationShaderModule = renderer.createShaderModule({ code: rayGenerationShaderCode });
-const intersectionShaderModule = renderer.createShaderModule({ code: intersectionShaderCode });
-const closestHitShaderModule = renderer.createShaderModule({ code: closestHitShaderCode });
-const missShaderModule = renderer.createShaderModule({ code: missShaderCode });
+    function runPencilBeamSimulation() {
+        // Initialize simulation parameters (e.g., number of pencil beams, step size, etc.)
+        const numPencilBeams = 1000;
+        const stepSize = 0.1;
+        const absorptionCoefficient = 0.1; // Example absorption coefficient
 
-// Load textures
-const absorptionTexture = await renderer.loadTexture("absorption_texture.png", WebGPU.WebGPULoadOptions.Default); // Use WebGPU namespace
-const scatteringTexture = await renderer.loadTexture("scattering_texture.png", WebGPU.WebGPULoadOptions.Default); // Use WebGPU namespace
+        // Perform pencil beam Monte Carlo simulation
+        for (let i = 0; i < numPencilBeams; i++) {
+            // Start each pencil beam from a random point in the volume
+            const startX = Math.random() * volumeWidth;
+            const startY = Math.random() * volumeHeight;
+            const startZ = Math.random() * volumeDepth;
 
-// Create uniform buffer for grid data
-const gridDimensions = [64, 64, 64]; // Example dimensions
-const voxelSize = 0.1; // Example voxel size
-const gridDataBuffer = renderer.createUniformBuffer(Float32Array.from([...gridDimensions, voxelSize])); // Use renderer.createUniformBuffer
+            let intensity = 1.0; // Initial intensity of the pencil beam
 
-// Create shader bindings
-const sourceDataBinding = new WebGPU.WebGPUShaderBinding("SourceData", sourceDataBuffer); // Assuming sourceDataBuffer is defined elsewhere
-const gridDataBinding = new WebGPU.WebGPUShaderBinding("GridData", gridDataBuffer);
-const absorptionMapBinding = new WebGPU.WebGPUShaderBinding("AbsorptionMap", absorptionTexture);
-const scatteringMapBinding = new WebGPU.WebGPUShaderBinding("ScatteringMap", scatteringTexture);
+            // Perform random walk of the pencil beam through the volume
+            let x = startX;
+            let y = startY;
+            let z = startZ;
+            while (intensity > 0) {
+                // Check if the pencil beam is inside the volume
+                if (x >= 0 && x < volumeWidth && y >= 0 && y < volumeHeight && z >= 0 && z < volumeDepth) {
+                    // Compute the absorption at the current position
+                    const absorption = absorptionCoefficient * stepSize;
 
-// Create compute pipeline for ray tracing
-const rayTracingPipeline = renderer.createRayTracingPipeline(); // Use renderer.createRayTracingPipeline
-rayTracingPipeline.setShaderStage("rayGeneration", rayGenerationShaderModule);
-rayTracingPipeline.setShaderStage("intersection", intersectionShaderModule);
-rayTracingPipeline.setShaderStage("closestHit", closestHitShaderModule);
-rayTracingPipeline.setShaderStage("miss", missShaderModule);
+                    // Update intensity based on absorption
+                    intensity *= Math.exp(-absorption);
 
-// Set up render pass
-const renderPassDesc = renderer.createRenderPassDescriptor(); // Use renderer.createRenderPassDescriptor
+                    // Move the pencil beam to the next position
+                    x += stepSize;
+                    y += stepSize;
+                    z += stepSize;
+                } else {
+                    // Pencil beam exited the volume, stop the simulation for this beam
+                    break;
+                }
+            }
 
-// Dispatch ray tracing shader
-renderPassDesc.setPipeline(rayTracingPipeline);
-renderPassDesc.setShaderBinding("SourceData", sourceDataBinding);
-renderPassDesc.setShaderBinding("GridData", gridDataBinding);
-renderPassDesc.setShaderBinding("AbsorptionMap", absorptionMapBinding);
-renderPassDesc.setShaderBinding("ScatteringMap", scatteringMapBinding);
-renderPassDesc.dispatch(1, 1, 1);
+        }
+    }
 
-// Execute render pass
-renderer.beginFrame();
-renderer.beginRenderPass(renderPassDesc);
-renderer.endRenderPass();
-renderer.endFrame();
+    runPencilBeamSimulation();
+})();
